@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Elearning đơn giản</title>
+    <!-- Tải Tailwind CSS từ CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Đảm bảo iframe phản hồi tốt trên mobile */
+        .responsive-iframe-container {
+            position: relative;
+            overflow: hidden;
+            /* Giữ chiều cao cố định để Form hiển thị đầy đủ trên mọi thiết bị */
+            height: 675px; 
+        }
+        .responsive-iframe-container iframe {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border: 0;
+        }
+        /* CSS cho hiệu ứng thông báo chặn tua */
+        .seek-block-message {
+            opacity: 0;
+            pointer-events: none;
+        }
+        .seek-block-message.visible {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen flex flex-col items-center p-4">
+
+    <!-- Container chính -->
+    <div class="w-full max-w-4xl bg-white p-6 md:p-10 rounded-xl shadow-2xl mt-8">
+
+        <!-- PHẦN 1: BANNER ĐƠN VỊ TỔ CHỨC (Nội dung được chèn bằng JavaScript) -->
+        <div class="bg-blue-800 text-white p-4 rounded-t-xl flex flex-col items-center justify-center">
+            <p id="banner-line-1" class="font-bold text-lg leading-tight"></p>
+            <p id="banner-line-2" class="font-medium text-base leading-tight"></p>
+        </div>
+
+        <!-- PHẦN 2: TÊN BÀI HỌC (Nội dung được chèn bằng JavaScript) -->
+        <h1 id="lesson-title" class="text-3xl font-extrabold text-indigo-700 mb-8 text-center border-b pb-4 pt-4">
+        </h1>
+
+        <!-- Khu vực nhúng Video YouTube (Thêm relative cho overlay) -->
+        <div class="relative aspect-video w-full rounded-lg overflow-hidden shadow-xl mb-4">
+            
+            <!-- THÔNG BÁO CHẶN TUA (MỚI) -->
+            <div id="seek-block-message" class="seek-block-message absolute inset-0 bg-red-600/90 text-white flex items-center justify-center text-xl font-bold p-4 transition-opacity duration-300 z-10 rounded-lg">
+                🚫 Chức năng tua video đã bị vô hiệu hóa. Vui lòng xem tiếp.
+            </div>
+            
+            <!-- URL src sẽ được thiết lập bằng JavaScript từ CONFIG.VIDEO_ID -->
+            <iframe
+                id="youtube-video"
+                src="" 
+                frameborder="0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowfullscreen
+                class="w-full h-full"
+                title="Video Bài Giảng"
+            ></iframe>
+        </div>
+        
+        <!-- Dòng thông báo quan trọng về bài kiểm tra (MỚI) -->
+        <p class="text-center text-lg font-semibold text-red-600 bg-red-100 p-3 rounded-lg border border-red-300 mb-10 shadow-md">
+            ⚠️ Thông báo quan trọng: các Anh Chị vui lòng xem hết video bài học để có thể thấy phần bài kiểm tra.
+        </p>
+
+        <!-- KHU VỰC CHỨA FORM (ẨN BAN ĐẦU) -->
+        <div id="quiz-container" style="display: none;">
+            
+            <h2 class="text-2xl font-bold text-gray-800 mb-4 text-center">
+                ✅ Bài Trắc Nghiệm (Đã Hoàn Thành Video)
+            </h2>
+
+            <!-- KHU VỰC NHÚNG GOOGLE FORM -->
+            <div class="responsive-iframe-container rounded-xl shadow-lg">
+                <!-- URL src sẽ được thiết lập bằng JavaScript từ CONFIG.QUIZ_URL -->
+                <iframe 
+                    id="quiz-iframe"
+                    src="" 
+                    width="100%" 
+                    height="675" 
+                    frameborder="0" 
+                    marginheight="0" 
+                    marginwidth="0"
+                    title="Google Form Quiz">
+                    Loading…
+                </iframe>
+            </div>
+            <!-- END KHU VỰC NHÚNG GOOGLE FORM -->
+
+            <p class="mt-8 text-center text-sm text-gray-500">
+                Vui lòng điền và nhấn Gửi trong Form này để hoàn tất bài kiểm tra.
+            </p>
+        </div>
+    </div>
+
+    <!-- PHẦN 3: FOOTER -->
+    <footer class="w-full max-w-4xl mt-8 p-4 bg-gray-200 text-gray-700 text-center rounded-xl shadow-inner text-sm md:text-base">
+        <p class="font-semibold mb-1">Liên hệ hỗ trợ:</p>
+        <p>
+            Mr. <span id="contact-name"></span> - 
+            <a id="contact-phone-link" href="#" class="text-indigo-600 hover:text-indigo-800 transition duration-150 ease-in-out font-medium"></a> - 
+            <a id="contact-email-link" href="#" class="text-indigo-600 hover:text-indigo-800 transition duration-150 ease-in-out font-medium"></a>
+        </p>
+    </footer>
+
+
+    <!-- Script tải API YouTube và Logic Giám Sát/Ẩn Hiện Form -->
+    <script>
+        // =====================================================================
+        // [KHỐI CẤU HÌNH TẬP TRUNG] - Dễ dàng cập nhật các thông tin bài học tại đây
+        // =====================================================================
+        const CONFIG = {
+            // 1. Dòng chữ lớn trên banner
+            BANNER_LINE_1: "Công ty Lưới điện Cao thế TPHCM",
+            // 2. Dòng chữ nhỏ trên banner
+            BANNER_LINE_2: "Đội Quản lý Đường dây",
+            // 3. Tiêu đề chính của bài học
+            LESSON_TITLE: "Bài số 1: Đào tạo nâng cao nhận thức an toàn thông tin trong EVNHCMC năm 2025",
+            // 4. ID video YouTube (Ví dụ: "4AKjAPLb4nw")
+            VIDEO_ID: "XSD4Bu9jt20", 
+            // 5. URL Google Form bài kiểm tra
+            QUIZ_URL: "https://docs.google.com/forms/d/e/1FAIpQLSfuGdLrMIKYDGEhpjjhwL7TnwUs02oufjsWfkEmxFd5kRb4kw/viewform?embedded=true",
+            // 6. Cho phép tua nhanh video (true: cho phép tua, false: cấm tua)
+            ALLOW_SEEKING: false, // Đổi thành false để test chức năng chặn tua
+            // [MỚI] 7. Cấu hình Footer
+            FOOTER_CONTACT: {
+                NAME: "Trần Công Đẹp",
+                PHONE: "0963.292.882",
+                EMAIL: "elearningesite2025@gmail.com"
+            }
+        };
+        // =====================================================================
+
+        let player;
+        let saveInterval;
+        let blockMessageTimeout; // Biến timeout cho thông báo chặn tua
+        const localStorageKey = 'video_resume_time_' + CONFIG.VIDEO_ID;
+        const highestWatchedKey = 'video_highest_time_' + CONFIG.VIDEO_ID; 
+        const seekBlockMessage = document.getElementById('seek-block-message');
+
+        // Hàm áp dụng CONFIG vào DOM trước khi tải API YouTube
+        function applyConfigToDOM() {
+            // Cập nhật Banner và Tiêu đề
+            document.getElementById('banner-line-1').textContent = CONFIG.BANNER_LINE_1;
+            document.getElementById('banner-line-2').textContent = CONFIG.BANNER_LINE_2;
+            document.getElementById('lesson-title').textContent = CONFIG.LESSON_TITLE;
+
+            // Cập nhật URL Video
+            const videoIframe = document.getElementById('youtube-video');
+            // Thêm 'controls=0' vào URL để ẩn thanh điều khiển của YouTube, ép buộc người dùng tương tác trong iframe
+            const videoUrl = `https://www.youtube.com/embed/${CONFIG.VIDEO_ID}?enablejsapi=1&version=3&playerapiid=ytplayer&rel=0&fs=0&controls=0&modestbranding=1&iv_load_policy=3`;
+            videoIframe.src = videoUrl;
+
+            // Cập nhật URL Quiz Form
+            document.getElementById('quiz-iframe').src = CONFIG.QUIZ_URL;
+
+            // Cập nhật Footer
+            const contact = CONFIG.FOOTER_CONTACT;
+            const phoneClean = contact.PHONE.replace(/[^\d]/g, ''); 
+            
+            document.getElementById('contact-name').textContent = contact.NAME;
+            
+            const phoneLink = document.getElementById('contact-phone-link');
+            phoneLink.href = `tel:${phoneClean}`;
+            phoneLink.textContent = contact.PHONE;
+
+            const emailLink = document.getElementById('contact-email-link');
+            emailLink.href = `mailto:${contact.EMAIL}`;
+            emailLink.textContent = contact.EMAIL;
+        }
+
+        // Hàm hiển thị thông báo chặn tua (MỚI)
+        function showSeekBlockMessage() {
+            if (!seekBlockMessage) return;
+            
+            // Xóa timeout cũ nếu có
+            clearTimeout(blockMessageTimeout);
+            
+            // Hiển thị thông báo
+            seekBlockMessage.classList.add('visible');
+            
+            // Tự động ẩn sau 3 giây
+            blockMessageTimeout = setTimeout(() => {
+                seekBlockMessage.classList.remove('visible');
+            }, 3000);
+        }
+
+        // Gọi hàm applyConfigToDOM khi DOM đã sẵn sàng
+        window.addEventListener('DOMContentLoaded', applyConfigToDOM);
+
+        // Hàm này được gọi tự động khi API YouTube đã sẵn sàng
+        function onYouTubeIframeAPIReady() {
+            player = new YT.Player('youtube-video', {
+                events: {
+                    'onReady': onPlayerReady,
+                    'onStateChange': onPlayerStateChange
+                }
+            });
+        }
+
+        // Hàm lưu vị trí hiện tại và vị trí cao nhất đã xem
+        function saveCurrentTimeAndHighest() {
+            if (player && typeof player.getCurrentTime === 'function') {
+                const currentTime = player.getCurrentTime();
+                let highestTime = parseFloat(localStorage.getItem(highestWatchedKey) || '0');
+
+                // Cập nhật vị trí cao nhất
+                if (currentTime > highestTime) {
+                    highestTime = currentTime;
+                    localStorage.setItem(highestWatchedKey, Math.floor(highestTime));
+                }
+                
+                // Vẫn lưu vị trí hiện tại để resume
+                localStorage.setItem(localStorageKey, Math.floor(currentTime));
+            }
+        }
+
+        function onPlayerReady(event) {
+            const savedTime = localStorage.getItem(localStorageKey);
+            
+            // Tải lại vị trí (chức năng resume)
+            if (savedTime && parseFloat(savedTime) > 0) {
+                event.target.seekTo(parseFloat(savedTime), true);
+                event.target.playVideo(); // Tự động phát tiếp
+            } else {
+                event.target.playVideo(); // Bắt đầu phát từ đầu nếu chưa xem
+            }
+
+            // Thiết lập cơ chế lưu tự động (mỗi 1 giây)
+            clearInterval(saveInterval); 
+            saveInterval = setInterval(() => {
+                const state = player.getPlayerState();
+                // Chỉ lưu khi video đang phát
+                if (state === YT.PlayerState.PLAYING) {
+                    saveCurrentTimeAndHighest();
+                    
+                    // [KIỂM TRA CẤM TUA]
+                    if (!CONFIG.ALLOW_SEEKING) {
+                        // Kiểm tra và ngăn người dùng tua lùi
+                        const currentTime = player.getCurrentTime();
+                        const highestTime = parseFloat(localStorage.getItem(highestWatchedKey) || '0');
+
+                        // Nếu người dùng tua lùi quá 2 giây so với vị trí cao nhất đã xem, tua lại.
+                        if (currentTime < highestTime - 2) {
+                            player.seekTo(highestTime, true);
+                            showSeekBlockMessage(); // HIỂN THỊ THÔNG BÁO (MỚI)
+                            console.warn("Chặn tua nhanh/tua lùi: Trở lại vị trí xem cao nhất.");
+                        }
+                    }
+                }
+            }, 1000); // Kiểm tra và lưu mỗi giây
+        }
+
+        // Lưu vị trí cuối cùng trước khi người dùng đóng/tải lại trang
+        window.addEventListener('beforeunload', saveCurrentTimeAndHighest);
+
+        // Xử lý sự kiện thay đổi trạng thái của Player
+        function onPlayerStateChange(event) {
+            const quizContainer = document.getElementById('quiz-container');
+            
+            // Trạng thái YT.PlayerState.ENDED (Video đã kết thúc)
+            if (event.data === YT.PlayerState.ENDED) {
+                // Xóa tất cả vị trí đã lưu
+                localStorage.removeItem(localStorageKey);
+                localStorage.removeItem(highestWatchedKey);
+
+                // Hiển thị Form Trắc Nghiệm
+                quizContainer.style.display = 'block';
+                
+                // Cuộn xuống để người dùng thấy Form ngay lập tức
+                quizContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            } else if (event.data === YT.PlayerState.PLAYING) {
+                 // Đảm bảo Form luôn ẩn khi video đang phát
+                quizContainer.style.display = 'none';
+            }
+        }
+
+        // Tải script YouTube Iframe Player API
+        const tag = document.createElement('script');
+        tag.src = "https://www.youtube.com/iframe_api";
+        const firstScriptTag = document.getElementsByTagName('script')[0];
+        firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+
+    </script>
+</body>
+</html>
